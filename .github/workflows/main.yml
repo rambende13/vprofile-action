@@ -29,6 +29,7 @@ jobs:
       - name: Setup SonarQube
         uses: warchant/setup-sonar-scanner@v7
 
+
       # Run sonar-scanner
       - name: SonarQube Scan
         run: sonar-scanner
@@ -41,17 +42,17 @@ jobs:
            -Dsonar.jacoco.reportsPath=target/jacoco.exec 
            -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml
            -Dsonar.java.binaries=target/test-classes/com/visualpathit/account/controllerTest/  
-#
+
       # Check the Quality Gate status.
-      #- name: SonarQube Quality Gate check
-      #  id: sonarqube-quality-gate-check
-      # uses: sonarsource/sonarqube-quality-gate-action@master
+      - name: SonarQube Quality Gate check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@master
         # Force to fail step after specific time.
-      #  timeout-minutes: 5
-      #  env:
-      #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #    SONAR_HOST_URL: ${{ secrets.SONAR_URL }} #OPTIONAL
-  
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_URL }} #OPTIONAL
+       
   BUILD_AND_PUBLISH:   
     needs: Testing
     runs-on: ubuntu-latest
@@ -71,7 +72,7 @@ jobs:
          daemon_off: false
          dockerfile: ./Dockerfile
          context: ./
-         
+
   DeployToEKS:
     needs: BUILD_AND_PUBLISH
     runs-on: ubuntu-latest
@@ -92,15 +93,9 @@ jobs:
       - name: Print config file
         run: cat ~/.kube/config
 
-      - name: Check if regcred secret exists
-        run: |
-         if kubectl get secret regcred; then
-         echo "Secret regcred already exists"
-         else
-         echo "Creating secret regcred"
-         kubectl create secret docker-registry regcred --docker-server=${{ secrets.REGISTRY }} --docker-username=AWS --docker-password=$(aws ecr get-login-password)
-         fi
-      
+      - name: Login to ECR
+        run: kubectl create secret docker-registry regcred --docker-server=${{ secrets.REGISTRY }} --docker-username=AWS  --docker-password=$(aws ecr get-login-password) 
+
       - name: Deploy Helm
         uses: bitovi/github-actions-deploy-eks-helm@v1.2.8
         with:
@@ -112,6 +107,4 @@ jobs:
           chart-path: helm/vprofilecharts
           namespace: default
           values: appimage=${{ secrets.REGISTRY }}/${{ env.ECR_REPOSITORY }},apptag=${{ github.run_number }}
-          name: vprofile-stack
-
-    
+          name: vprofile-stack    
